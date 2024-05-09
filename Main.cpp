@@ -8,6 +8,9 @@
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600; /* Width and Height of Window*/
 
+uint32_t glfwExtensionCount = 0;
+const char** glfwExtensions; /* Definitions for the global extensions to interface with windows*/
+
 /* The program is wrapped into a class that will store the vulkan objects as private class members
 and functions to initiate them. 
 
@@ -24,6 +27,7 @@ class HelloTriangleApplication {
 public:
 	void run() {
 		initWindow();
+		createInstance();
 		initVulkan();
 		mainLoop();
 		cleanup();
@@ -41,9 +45,40 @@ private:
 	}
 	GLFWwindow* window; /* stores a refernce to window*/
 
-	void initVulkan() {
-
+	void createInstance() { /* Application specific information */
+		VkApplicationInfo appInfo{};
+		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		appInfo.pApplicationName = "Triangle";
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.pEngineName = "No Engine";
+		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.apiVersion = VK_API_VERSION_1_0;
 	}
+
+	void initVulkan() {
+		createInstance(); /* Invoking vulkan instance*/
+
+		/* Structure that tells vulkan driver which global extensions and validation layers to use*/
+		VkInstanceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		createInfo.pApplicationInfo = &appInfo;
+
+		/* glfw function that returns extensions needed for the window system*/
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		createInfo.enabledExtensionCount = glfwExtensionCount;
+		createInfo.ppEnabledExtensionNames = glfwExtensions;
+		createInfo.enabledLayerCount = 0;
+
+		/*Everything is specified now we can create an vlcreateinstance call*/
+		VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
+
+		/*Check if an instance is created successfully*/
+		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create instance");
+		}
+	}
+	VkInstance instance; /* Data member to hold the instance */
 
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
@@ -52,10 +87,13 @@ private:
 	}
 
 	void cleanup() {
+		vkDestroyInstance(instance, nullptr);
+
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
 	}
+
 };
 
 int main() {
