@@ -3,10 +3,28 @@
 
 #include <iostream> 
 #include <stdexcept> /* These two headers report and propogate errors*/
+#include <vector> /* Include vector type data */
+#include <cstring> /* Needed for strcamp function */
 #include <cstdlib> /* This header provides macros for exit_success and _failure*/
+
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600; /* Width and Height of Window*/
+
+///////////////////////////* Code for vailadation layers (debugging) */////////////////////////////////////
+
+/* Configuration variables to specify validation layers */
+const std::vector<const char*> validationLayers = {
+	"VK_LAYER_KHRONOS_validation"
+};
+
+#ifdef NDEBUG
+	const bool enableValidationLayers = false;
+#else
+	const bool enableValidationLayers = true;
+#endif
+
+//////////////////////////////*END_OFF*/////////////////////////////////////////////////////////////////////////
 
 /* The program is wrapped into a class that will store the vulkan objects as private class members
 and functions to initiate them. 
@@ -27,7 +45,6 @@ public:
 		initVulkan();
 		mainLoop();
 		cleanup();
-
 	}
 private:
 	GLFWwindow* window; /* stores a refernce to window*/
@@ -61,7 +78,13 @@ private:
 
 		glfwTerminate();
 	}
-	void createInstance() { /* Application specific information */
+	void createInstance() { 
+		/* checking validation layers */
+		if (enableValidationLayers && !checkValidationLayerSupport()) {
+			throw std::runtime_error("validation layers requested, but not available");
+		}
+		
+		/* Application specific information */
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = "Triangle";
@@ -74,6 +97,13 @@ private:
 		VkInstanceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else {
+			createInfo.enabledLayerCount = 0;
+		}
 
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensions; /* Definitions for the global extensions to interface with windows*/
@@ -92,6 +122,34 @@ private:
 			throw std::runtime_error("failed to create instance");
 		}
 	};
+	/* Function to check if all requested layers are available */
+	bool checkValidationLayerSupport() {
+		uint32_t layerCount;
+		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+		std::vector<VkLayerProperties> availableLayers(layerCount);
+		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+		return false;
+
+		/* Checking if all layers in validation layers exist in available layers*/
+		for (const char* layerName : validationLayers) {
+			bool layerFound = false;
+
+			for (const auto& layerProperties : availableLayers) {
+				if (strcmp(layerName, layerProperties.layerName) == 0) {
+					layerFound = true;
+					break;
+				}
+			}
+
+			if (!layerFound) {
+				return false;
+			}
+		}
+
+		return true;
+	}
 };
 
 int main() {
