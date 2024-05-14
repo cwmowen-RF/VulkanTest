@@ -6,7 +6,7 @@
 #include <vector> /* Include vector type data */
 #include <cstring> /* Needed for strcamp function */
 #include <cstdlib> /* This header provides macros for exit_success and _failure*/
-
+#include <optional> /* header to allow us to query whether a value exists or not */
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600; /* Width and Height of Window*/
@@ -43,6 +43,15 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 
 	}
 }
+
+/* structure to store queue family values*/
+	/* Data value is optional as queue family may not exist*/
+struct QueueFamilyIndices {
+	std::optional<uint32_t> graphicsFamily;
+	bool isComplete() {
+	return graphicsFamily.has_value();
+	}
+};
 //////////////////////////////*END_OFF*/////////////////////////////////////////////////////////////////////////
 
 /* The program is wrapped into a class that will store the vulkan objects as private class members
@@ -57,6 +66,8 @@ mainLoop iterates until the window is closed
 cleanup will deallocate the memory resources 
 
 Every resultant feature will be a new function to be called from initVulkan*/
+
+
 class HelloTriangleApplication {
 public:
 	void run() {
@@ -66,9 +77,12 @@ public:
 		cleanup();
 	}
 private:
-	GLFWwindow* window; /* stores a refernce to window*/
-	VkInstance instance; /* Data member to hold the instance */
-	VkDebugUtilsMessengerEXT debugMessenger; /*handle for vulkan debug callback handle*/
+	
+	GLFWwindow* window;
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debugMessenger;
+
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
 	void initWindow() {
 
@@ -79,11 +93,11 @@ private:
 
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan Triangle Demo", nullptr, nullptr); /* initialising window*/
 	}
-
+	
 	void initVulkan() {
 		createInstance(); /* Invoking vulkan instance*/
-		setupDebugMessenger();
-
+		setupDebugMessenger(); /* Setting up debug messenger*/
+		pickPhysicalDevice(); /* Stores graphics card in physical device handle*/
 	}
 
 	void setupDebugMessenger() {
@@ -225,7 +239,76 @@ private:
 		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		createInfo.pfnUserCallback = debugCallback;
 	}
+
+	void pickPhysicalDevice() {
+
+		/* Similar process to listing extensions*/
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+		/* Stopping if no graphics card exists*/
+
+		if (deviceCount == 0) {
+			throw std::runtime_error("failed to find GPUs with Vulkan Support");
+		}
+
+		/* Creating array to hold all phyical device handles */
+
+		std::vector<VkPhysicalDevice> devices(deviceCount);
+		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+		/* Checking capabilities of graphics card */
+
+		for (const auto& device : devices) {
+			if (isDeviceSuitable(device)) {
+				physicalDevice = device;
+				break;
+			}
+		}
+
+		if (physicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("failed to find a suitable GPU");
+		}
+	}
+
+	/* bool that stores whether a graphics card is suitable, calls the queue family finder function*/
+
+	bool isDeviceSuitable(VkPhysicalDevice device) {
+		QueueFamilyIndices indices = findQueueFamilies(device);
+
+		return indices.isComplete();
+
+	}
+
+	/* checking if a graphics card can support the queue families we need for our application*/
+
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) {
+
+			/* break loop if queue is found that supports graphics operations*/
+
+			if (indices.isComplete()) {
+				break;
+			}
+			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+				indices.graphicsFamily = i;
+			}
+			i++;
+		}
+		return indices;
+	};
+	
 };
+	
 
 int main() {
 	HelloTriangleApplication app;
