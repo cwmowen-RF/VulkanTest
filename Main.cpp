@@ -78,11 +78,16 @@ public:
 	}
 private:
 	
+	/* Creates class memebrs to store the window instance, vulkan instance and debug messenger*/
 	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 
+	/* Class memebers to store the physical device, logical device and queue handle*/
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device;
+	VkQueue graphicsQueue;
+
 
 	void initWindow() {
 
@@ -98,6 +103,7 @@ private:
 		createInstance(); /* Invoking vulkan instance*/
 		setupDebugMessenger(); /* Setting up debug messenger*/
 		pickPhysicalDevice(); /* Stores graphics card in physical device handle*/
+		createLogicalDevice(); /* Calls function to create logical device*/
 	}
 
 	void setupDebugMessenger() {
@@ -122,6 +128,9 @@ private:
 	}
 
 	void cleanup() {
+
+		vkDestroyDevice(device, nullptr);
+
 		if (enableValidationLayers) {
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		}
@@ -306,6 +315,58 @@ private:
 		}
 		return indices;
 	};
+	void createLogicalDevice() {
+		/* The creation of a logical device involves specifying details in structures*/
+
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+
+		/* Assigning queue priotiries, values between 0-1*/
+
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		/* Specifiying device (graphics card) features*/
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+
+		/* Now we can start filling in VkDevice info*/
+
+		VkDeviceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+		/* Pointers to the queue creation info*/
+
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		/* Rest of information is specifying extensions and validation layers*/
+
+		createInfo.enabledExtensionCount = 0;
+
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else {
+			createInfo.enabledLayerCount = 0;
+		}
+		/* Now we are ready to instantiate the logiacal device with a call to create device*/
+		/* Parameters are physical device to interface with, queue and usage info, optional callbaks pointer, and pointer to variable to store the logical device in*/
+
+		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create a logical device");
+		}
+
+		/* Now we just call a function to create our queue handles, we use 0 as we are creating a single queue*/
+
+		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+	}
 	
 };
 	
